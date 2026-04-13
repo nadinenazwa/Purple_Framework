@@ -14,6 +14,7 @@ class ExampleTest extends TestCase
     {
         $response = $this->get('/');
 
-        $response->assertStatus(200);
+        // Root redirects to dashboard which is `/home` in this app
+        $response->assertRedirect('/home');
     }
 }

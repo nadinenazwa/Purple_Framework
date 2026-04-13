@@ -81,6 +81,8 @@ class POSController extends Controller
                 }
             }
             $items = $q->get();
+            // Diagnostic log to help debug empty menu lists
+            try { \Log::debug('getMenusByVendor: menus', ['vendor_id' => $vendorId, 'count' => is_countable($items) ? count($items) : null]); } catch (\Throwable $e) { }
             return response()->json($items);
         }
 
@@ -88,9 +90,11 @@ class POSController extends Controller
             $q = DB::table('menu');
             if ($vendorId) $q->where('menu.idvendor', $vendorId);
             $items = $q->get();
+            try { \Log::debug('getMenusByVendor: menu', ['vendor_id' => $vendorId, 'count' => is_countable($items) ? count($items) : null]); } catch (\Throwable $e) { }
             return response()->json($items);
         }
 
+        try { \Log::debug('getMenusByVendor: no menus table', ['vendor_id' => $vendorId]); } catch (\Throwable $e) { }
         return response()->json([]);
     }
 
@@ -401,7 +405,14 @@ class POSController extends Controller
                 try { $colTypePesanan = Schema::getColumnType('pesanan', 'status_bayar'); } catch (\Throwable $e) { $colTypePesanan = null; }
                 $updatePayload['status_bayar'] = in_array($colTypePesanan, ['integer','bigint','tinyint','smallint','mediumint','boolean']) ? 1 : 'Lunas';
                 if (Schema::hasColumn('pesanan', 'metode_bayar') && isset($payload['payment_type'])) {
-                    $updatePayload['metode_bayar'] = $payload['payment_type'];
+                    try {
+                        $colType = Schema::getColumnType('pesanan', 'metode_bayar');
+                    } catch (\Throwable $e) { $colType = null; }
+                    // Only set as string when column supports text; otherwise skip to avoid type errors
+                    $stringLike = ['string','text','varchar','char','longtext','mediumtext'];
+                    if (in_array($colType, $stringLike)) {
+                        $updatePayload['metode_bayar'] = $payload['payment_type'];
+                    }
                 }
                 $updated = DB::table('pesanan')->where('order_id', $orderId)->update($updatePayload);
                 if ($updated) { return response('OK', 200); }
@@ -411,7 +422,13 @@ class POSController extends Controller
                 try { $colTypePenj = Schema::getColumnType('penjualans', 'status_bayar'); } catch (\Throwable $e) { $colTypePenj = null; }
                 $updatePayload2 = ['status_bayar' => in_array($colTypePenj, ['integer','bigint','tinyint','smallint','mediumint','boolean']) ? 1 : 'Lunas'];
                 if (Schema::hasColumn('penjualans', 'metode_bayar') && isset($payload['payment_type'])) {
-                    $updatePayload2['metode_bayar'] = $payload['payment_type'];
+                    try {
+                        $colType2 = Schema::getColumnType('penjualans', 'metode_bayar');
+                    } catch (\Throwable $e) { $colType2 = null; }
+                    $stringLike2 = ['string','text','varchar','char','longtext','mediumtext'];
+                    if (in_array($colType2, $stringLike2)) {
+                        $updatePayload2['metode_bayar'] = $payload['payment_type'];
+                    }
                 }
                 $updated2 = DB::table('penjualans')->where('order_id', $orderId)->update($updatePayload2);
                 if ($updated2) { return response('OK', 200); }
@@ -498,6 +515,37 @@ class POSController extends Controller
                 }
             }
             $order_id = $r->order_id ?? null;
+            // Generate a QR representation for the order (prefer server-side QR library)
+            $qrData = null;
+            if ($order_id) {
+                try {
+                    if (class_exists('\\Endroid\\QrCode\\QrCode')) {
+                        // Endroid QR Code v4+ usage
+                        $qr = new \Endroid\QrCode\QrCode($order_id);
+                        if (method_exists($qr, 'writeString')) {
+                            $png = $qr->writeString();
+                            $qrData = 'data:image/png;base64,' . base64_encode($png);
+                        } else {
+                            // older API fallback
+                            $data = $qr->getString();
+                            $qrData = 'data:image/png;base64,' . base64_encode($data);
+                        }
+                    } elseif (class_exists('QrCode')) {
+                        // support for simple-qrcode facade (simplesoftwareio/simple-qrcode)
+                        try {
+                            $png = QrCode::format('png')->size(150)->generate($order_id);
+                            $qrData = 'data:image/png;base64,' . base64_encode($png);
+                        } catch (\Throwable $e) { $qrData = null; }
+                    } else {
+                        // Fallback: use a public QR generation service (requires internet)
+                        $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' . urlencode($order_id);
+                        $qrData = $qrUrl;
+                    }
+                } catch (\Throwable $e) {
+                    // On any error, fallback to external service URL
+                    $qrData = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' . urlencode($order_id);
+                }
+            }
             $guest = $r->nama ?? ($r->nama_pembeli ?? null) ?? 'Guest';
             $total = $r->total ?? 0;
             $status = $r->status_bayar ?? ($r->status ?? 'Belum');
@@ -565,6 +613,7 @@ class POSController extends Controller
                 'id' => $id,
                 'time' => $timeStr,
                 'order_id' => $order_id,
+                'qr' => $qrData,
                 'guest' => $guest,
                 'details' => $details,
                 'total' => $total,
@@ -659,7 +708,14 @@ class POSController extends Controller
                     // prepare update payload and include metode_bayar if the column exists
                     $payload = [$colToUpdate => $newStatusValue];
                     if (Schema::hasColumn($table, 'metode_bayar') && $paymentType) {
-                        $payload['metode_bayar'] = $paymentType;
+                        try { $metodeColType = Schema::getColumnType($table, 'metode_bayar'); } catch (\Throwable $e) { $metodeColType = null; }
+                        $stringLikeCols = ['string','text','varchar','char','longtext','mediumtext'];
+                        if (in_array($metodeColType, $stringLikeCols)) {
+                            $payload['metode_bayar'] = $paymentType;
+                        } else {
+                            // column not string-like (likely integer) — skip setting metode_bayar to avoid type errors
+                            Log::debug('Skipping metode_bayar update due to non-string column', ['table' => $table, 'colType' => $metodeColType, 'paymentType' => $paymentType]);
+                        }
                     }
                     // update the detected column name (either status_bayar or status) and metode_bayar when available
                     $updateQuery->update($payload);
@@ -672,5 +728,66 @@ class POSController extends Controller
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    // Serve a PNG QR code for an order (looks up by id or order_id)
+    public function orderQr($id)
+    {
+        // prefer `pesanan` table if exists, otherwise `penjualans`
+        $table = Schema::hasTable('pesanan') ? 'pesanan' : (Schema::hasTable('penjualans') ? 'penjualans' : null);
+        if (! $table) return abort(404);
+
+        // find the order row by available id-like columns
+        $idCandidates = ['id','id_pesanan','idpesanan','id_penjualan','idpenjualan','id_order','order_id'];
+        $row = null;
+        foreach ($idCandidates as $col) {
+            if (Schema::hasColumn($table, $col)) {
+                $row = DB::table($table)->where($col, $id)->first();
+                if ($row) break;
+            }
+        }
+        if (! $row) return abort(404);
+
+        $orderId = $row->order_id ?? null;
+        if (! $orderId) {
+            // if no order_id stored, try to construct a fallback string
+            $orderId = 'order-' . $table . '-' . ($row->id ?? $row->id_pesanan ?? $row->id_penjualan ?? $id) . '-' . now()->timestamp;
+        }
+
+        // Try Endroid first
+        try {
+            if (class_exists('\\Endroid\\QrCode\\QrCode')) {
+                // Endroid v4+ API
+                try {
+                    $qr = new \Endroid\QrCode\QrCode($orderId);
+                    // set a reasonable size
+                    if (method_exists($qr, 'setSize')) $qr->setSize(300);
+                    if (method_exists($qr, 'writeString')) {
+                        $png = $qr->writeString();
+                        return response($png, 200)->header('Content-Type', 'image/png');
+                    }
+                } catch (\Throwable $e) {
+                    // continue to next fallback
+                }
+            }
+
+            // simplesoftwareio/simple-qrcode (Facade or class)
+            if (class_exists('QrCode') || class_exists('SimpleSoftwareIO\\QrCode\\Facades\\QrCode')) {
+                try {
+                    // generate PNG binary
+                    $png = \QrCode::format('png')->size(300)->generate($orderId);
+                    return response($png, 200)->header('Content-Type', 'image/png');
+                } catch (\Throwable $e) {
+                    // fallback
+                }
+            }
+
+        } catch (\Throwable $e) {
+            // swallow and fallback to external service
+        }
+
+        // Fallback: redirect to external QR image generator
+        $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' . urlencode($orderId);
+        return redirect($qrUrl);
     }
     }

@@ -44,8 +44,8 @@
       </a>
     </li>
 
-    <li class="nav-item {{ request()->is('pos*') ? 'active' : '' }}">
-      <a class="nav-link" href="{{ route('pos.index') }}">
+    <li class="nav-item {{ request()->is('POS*') ? 'active' : '' }}">
+      <a class="nav-link" href="{{ route('POS.menu') }}">
         <span class="menu-title">POS</span>
         <i class="mdi mdi-cash-register menu-icon"></i>
       </a>
@@ -122,6 +122,21 @@
           <li class="nav-item {{ request()->is('pdf/announcement') ? 'active' : '' }}">
             <a class="nav-link" href="{{ route('pdf.announcement') }}" target="_blank">Pengumuman (Portrait)</a>
           </li>
+        </ul>
+      </div>
+    </li>
+
+    <li class="nav-item {{ request()->is('customer*') ? 'active' : '' }}">
+      <a class="nav-link" data-bs-toggle="collapse" href="#customerMenu" aria-expanded="{{ request()->is('customer*') ? 'true' : 'false' }}" aria-controls="customerMenu">
+        <span class="menu-title">Customer</span>
+        <i class="menu-arrow"></i>
+        <i class="mdi mdi-account-multiple menu-icon"></i>
+      </a>
+      <div class="collapse {{ request()->is('customer*') ? 'show' : '' }}" id="customerMenu">
+        <ul class="nav flex-column sub-menu">
+          <li class="nav-item {{ request()->is('customer') ? 'active' : '' }}"><a class="nav-link" href="{{ route('customer.index') }}">Data Customer</a></li>
+          <li class="nav-item {{ request()->is('customer/create-blob') ? 'active' : '' }}"><a class="nav-link" href="{{ route('customer.create.blob') }}">Tambah Customer 1 (blob)</a></li>
+          <li class="nav-item {{ request()->is('customer/create-file') ? 'active' : '' }}"><a class="nav-link" href="{{ route('customer.create.file') }}">Tambah Customer 2 (file)</a></li>
         </ul>
       </div>
     </li>

@@ -1,101 +1,106 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Label Cetak</title>
-  <style>
-    /* Paper size: 21cm x 16cm (210mm x 160mm) - use zero page margin and place content explicitly */
-    @page { size: 210mm 160mm; margin: 0; }
-    html, body { margin:0; padding:0; width:210mm; height:160mm; font-family: sans-serif; }
-    /* place sheet absolutely at page top-left inside the page margins (left/right 5mm, top/bottom 4mm) */
-    .sheet { position: absolute; left:5mm; top:4mm; width:200mm; height:152mm; padding:0; margin:0; }
-    /* Absolute positioned cells inside the sheet: exact 40mm x 19mm boxes */
-    .cell { position: absolute; width:40mm; height:19mm; box-sizing: border-box; padding:1mm; overflow: hidden; }
-    .cell .name { font-size:8px; margin-bottom:1mm; }
-    .cell .price { font-size:11px; font-weight:bold; margin-bottom:1mm; }
-    .cell .meta { font-size:7px; font-weight:normal; color:#222; }
-    table.labels { width:100%; height:100%; border-collapse: collapse; table-layout: fixed; border-spacing:0; font-family: sans-serif; }
-    /* 5 columns x 8 rows. Each cell exactly 40mm x 19mm */
-    table.labels tr { height:19mm; }
-    table.labels td { width:40mm; height:19mm; border: none; padding:0; margin:0; box-sizing: border-box; vertical-align: top; overflow: hidden; }
-    /* Prevent Dompdf from splitting the table across pages */
-    table.labels, table.labels tr, table.labels td { page-break-inside: avoid; page-break-after: avoid; }
-    /* inner wrapper keeps small padding without altering cell box size */
-    .cell-inner { padding:1mm; box-sizing: border-box; height:100%; overflow: hidden; }
-    .price { font-size:11px; font-weight:bold; line-height:1; }
-    .name { font-size:8px; line-height:1; }
-    /* Ensure contents stay at the top of the cell */
-    .cell-inner { display:flex; flex-direction:column; justify-content:flex-start; }
-    .cell-inner > div { margin:0; padding:0; }
-  </style>
-</head>
-<body>
-  @php $grid = $grid ?? []; @endphp
-  <div class="sheet">
-    @foreach($grid as $rIndex => $row)
-      @foreach($row as $cIndex => $cell)
-        <div class="cell" style="left: {{ $cIndex * 40 }}mm; top: {{ $rIndex * 19 }}mm;">
-          @if($cell)
-            <div class="name">{{ $cell->nama }}</div>
-            <div class="price">Rp {{ number_format($cell->harga,0,',','.') }}</div>
-            <div class="meta">{{ $cell->id_barang }}</div>
-          @endif
+@extends('layouts.master')
+
+@section('content')
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header">
+            <h4>Tag Harga UMKM</h4>
         </div>
-      @endforeach
-    @endforeach
-  </div>
+        <div class="card-body">
+            <form method="POST" action="{{ route('barangs.print') }}" id="print-form">
+                @csrf
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label>Start X (Kolom 1-5)</label>
+                        <input type="number" name="start_x" class="form-control" min="1" max="5" value="1" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label>Start Y (Baris 1-8)</label>
+                        <input type="number" name="start_y" class="form-control" min="1" max="8" value="1" required>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <a href="{{ route('barang.create') }}" class="btn btn-success mr-2" id="add-button">Tambah Barang</a>
+                        <button type="submit" class="btn btn-primary" id="print-button">Cetak Label</button>
+                    </div>
+                </div>
 
-  <!-- Dependencies (CDN) -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+                <div class="table-responsive">
+                    <table class="table table-striped" id="barangs-table">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="select-all"></th>
+                                <th>ID</th>
+                                <th>Nama</th>
+                                <th>Harga</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($barangs as $barang)
+                            <tr>
+                                <td><input type="checkbox" name="ids[]" value="{{ $barang->id_barang }}"></td>
+                                <td>{{ $barang->id_barang }}</td>
+                                <td>{{ $barang->nama }}</td>
+                                <td>{{ number_format($barang->harga, 0, ',', '.') }}</td>
+                                <td>
+                                    <a href="{{ route('barang.edit', $barang->id_barang) }}" class="btn btn-sm btn-warning">Edit</a>
+                                    <button type="button" class="btn btn-sm btn-danger delete-button" data-url="{{ route('barang.destroy', $barang->id_barang) }}" data-name="{{ $barang->nama }}">Hapus</button>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
-  <script>
-    $(function(){
-      // Initialize Select2 for the second select
-      $('#select2Select').select2({
-        placeholder: '-- Pilih kota --',
-        width: '100%'
-      });
+@endsection
 
-      // Tambahkan option ke kedua select saat tombol diklik
-      $('#btnTambah').on('click', function(e){
-        e.preventDefault();
-        var kotaInputEl = document.getElementById('kotaInput');
-        // HTML5 validation: check and report
-        if (!kotaInputEl.checkValidity()) {
-          kotaInputEl.reportValidity();
-          return;
-        }
-        var kota = $('#kotaInput').val().trim();
-
-        // create new option element
-        var $opt1 = $('<option>').val(kota).text(kota);
-        var $opt2 = $('<option>').val(kota).text(kota);
-
-        // append to normal select
-        $('#normalSelect').append($opt1);
-
-        // append to select2 and notify Select2 to update
-        $('#select2Select').append($opt2).trigger('change');
-
-        // clear input
-        $('#kotaInput').val('');
-      });
-
-      // Saat user memilih kota di salah satu select, tampilkan ke #kotaTerpilih
-      $('#normalSelect, #select2Select').on('change', function(){
-        // use $(this).val() per requirement
-        var val = $(this).val();
-        if(!val) val = '-';
-        $('#kotaTerpilih').text(val);
-      });
+@section('scripts')
+<script>
+    document.getElementById('select-all').addEventListener('change', function(e){
+        const checked = e.target.checked;
+        document.querySelectorAll('input[name="selected_ids[]"]').forEach(cb => cb.checked = checked);
     });
-  </script>
 
-  <!-- POS demo removed for label printing -->
-  <!-- The interactive POS demo was removed from this print template to keep labels clean. -->
-</body>
-</html>
+    // Optional: initialize datatables if present
+    if (window.jQuery && $.fn.dataTable) {
+        $('#barangs-table').DataTable();
+    }
+
+    // Delete button handler: create and submit a DELETE form dynamically
+    (function(){
+        const csrf = '{{ csrf_token() }}';
+        document.addEventListener('click', function(e){
+            const btn = e.target.closest('.delete-button');
+            if (!btn) return;
+            const url = btn.getAttribute('data-url');
+            const name = btn.getAttribute('data-name') || 'item';
+            if (!url) return;
+            if (!confirm('Hapus "' + name + '"? Data yang dihapus tidak dapat dikembalikan.')) return;
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = url;
+            form.style.display = 'none';
+
+            const tokenInput = document.createElement('input');
+            tokenInput.type = 'hidden';
+            tokenInput.name = '_token';
+            tokenInput.value = csrf;
+            form.appendChild(tokenInput);
+
+            const methodInput = document.createElement('input');
+            methodInput.type = 'hidden';
+            methodInput.name = '_method';
+            methodInput.value = 'DELETE';
+            form.appendChild(methodInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        });
+    })();
+</script>
+@endsection

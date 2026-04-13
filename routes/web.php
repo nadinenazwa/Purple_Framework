@@ -54,9 +54,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('barang/demo', function () { return view('barang.demo_plain'); })->name('barang.demo_plain');
     Route::get('barang/demo-dt', function () { return view('barang.demo_datatables'); })->name('barang.demo_datatables');
     // Kota labels/demo page
-    Route::get('barang/labels', function () { return view('barang.labels'); })->name('barang.labels');
+    Route::get('barang/labels', function () { 
+        $barangs = \App\Models\Barang::all();
+        return view('barang.labels', compact('barangs'));
+    })->name('barang.labels');
     // POS (Point of Sales) page and API
     Route::get('pos', [POSController::class, 'index'])->name('pos.index');
+    // Public POS ordering UI (separate file)
+    Route::get('POS', function () { return view('pos_baru'); })->name('POS.menu');
     // Public-friendly kantin (customer-facing) route -> POS ordering UI
     Route::get('kantin', [POSController::class, 'index'])->name('kantin.index');
     Route::get('api/pos/barang/{kode}', [POSController::class, 'getBarang']);
@@ -64,6 +69,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('midtrans/snap/{id}', [POSController::class, 'getSnapToken']);
     // Semua Pesanan Kantin (list)
     Route::get('pesanan', [POSController::class, 'allPesanan'])->name('pesanan.index');
+    // Endpoint to serve order QR (image/png) for a given order id
+    Route::get('pos/{id}/qr', [POSController::class, 'orderQr']);
     // Sync status endpoint (AJAX)
     Route::post('api/pesanan/sync/{id}', [POSController::class, 'syncStatus']);
     // Sync status endpoint (AJAX)
@@ -73,6 +80,14 @@ Route::middleware(['auth'])->group(function () {
     Route::post('api/pos/penjualan', [POSController::class, 'storePenjualan']);
         // API for vendor menus (used by ordering page via AJAX)
         Route::get('api/menus', [POSController::class, 'getMenusByVendor']);
+    // Customer management (camera capture examples)
+    Route::get('customer', [App\Http\Controllers\CustomerController::class, 'index'])->name('customer.index');
+    Route::get('customer/create-blob', [App\Http\Controllers\CustomerController::class, 'createBlob'])->name('customer.create.blob');
+    Route::post('customer/store-blob', [App\Http\Controllers\CustomerController::class, 'storeBlob'])->name('customer.store.blob');
+    Route::get('customer/create-file', [App\Http\Controllers\CustomerController::class, 'createFile'])->name('customer.create.file');
+    Route::post('customer/store-file', [App\Http\Controllers\CustomerController::class, 'storeFile'])->name('customer.store.file');
+    // Combined form with address + modal camera (saves as BLOB)
+    Route::get('customer/create', [App\Http\Controllers\CustomerController::class, 'createFull'])->name('customer.create');
     // Dedicated Kota page
     Route::get('kota', function () { return view('kota.index'); })->name('kota.index');
 

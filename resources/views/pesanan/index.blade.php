@@ -23,6 +23,11 @@
                 <td style="min-width:200px">
                   <div>{{ $o['time'] }}</div>
                   <div style="font-size:12px;color:#666">{{ $o['order_id'] ?? '-' }}</div>
+                  @if(!empty($o['qr']))
+                    <div style="margin-top:6px">
+                      <img src="{{ $o['qr'] }}" alt="QR" style="height:48px;width:48px;display:block;border:1px solid #eee;padding:4px;background:#fff" />
+                    </div>
+                  @endif
                 </td>
                 <td>{{ $o['guest'] }}</td>
                 <td>

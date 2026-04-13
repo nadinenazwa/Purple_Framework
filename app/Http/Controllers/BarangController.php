@@ -92,6 +92,25 @@ class BarangController extends Controller
         // select by primary key `id_barang`
         $items = Barang::whereIn('id_barang', $ids)->get();
 
+        // Generate barcode images (base64 PNG) for each item when generator is available.
+        foreach ($items as $it) {
+            try {
+                if (class_exists(\Picqer\Barcode\BarcodeGeneratorPNG::class)) {
+                    $generator = new \Picqer\Barcode\BarcodeGeneratorPNG();
+                    // Use CODE 128 for compact alphanumeric barcodes
+                    $png = $generator->getBarcode((string)$it->id_barang, $generator::TYPE_CODE_128);
+                    $it->barcode = 'data:image/png;base64,' . base64_encode($png);
+                } else {
+                    // If Picqer not installed, set null and log a hint
+                    \Log::warning('Picqer barcode generator not installed. Run: composer require picqer/php-barcode-generator');
+                    $it->barcode = null;
+                }
+            } catch (\Throwable $e) {
+                \Log::error('Barcode generation failed', ['id' => $it->id_barang, 'error' => $e->getMessage()]);
+                $it->barcode = null;
+            }
+        }
+
         // Desired cell size in mm: 4cm x 1.9cm => 40mm x 19mm
         // Fixed grid: 5 columns x 8 rows as requested
         $cols = 5;
@@ -119,15 +138,10 @@ class BarangController extends Controller
             $grid[] = $row;
         }
 
-        // Set custom paper size to 210mm x 160mm (convert mm to points: 1 mm = 72/25.4 pt)
-        // 210mm -> ~595.28pt, 160mm -> ~452.76pt
-        $widthPt = 210 * 72 / 25.4; // ~595.28
-        $heightPt = 160 * 72 / 25.4; // ~452.76
-
-        // Dompdf expects a 4-element array: [left, top, width, height]
-        $pdf = Pdf::loadView('barang.labels', [
+        // Use standard A4 portrait for label printing
+        $pdf = Pdf::loadView('barang.labels_pdf', [
             'grid' => $grid,
-        ])->setPaper([0.0, 0.0, $widthPt, $heightPt], 'portrait');
+        ])->setPaper('a4', 'portrait');
 
         return $pdf->stream('labels.pdf');
     }

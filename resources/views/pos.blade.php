@@ -93,9 +93,11 @@
   const payBtn = document.getElementById('payBtn');
 
   let cart = [];
+  let lastOrderId = null;
 
   function formatRp(v){
-    return 'Rp ' + v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const n = Number(v) || 0;
+    return 'Rp ' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
 
   function updateTotal(){
@@ -143,25 +145,38 @@
     fetch('/api/menus?vendor_id=' + encodeURIComponent(vid))
       .then(r => r.json())
       .then(data => {
+        console.log('GET /api/menus response for vendor', vid, data);
         menuSelect.innerHTML = '<option value="">-- Pilih Menu --</option>';
         if (!Array.isArray(data)) {
           // if returned object with data property
           try { data = data.data || []; } catch(e) { data = []; }
         }
-        data.forEach(it => {
-          // Try common column names
-          const id = it.id ?? it.idmenu ?? it.ID ?? it.id_menu ?? it.id_menu;
-          const name = it.name ?? it.nama ?? it.nama_menu ?? it.title ?? 'Menu';
-          const price = it.price ?? it.harga ?? it.price ?? 0;
-          const opt = document.createElement('option');
-          opt.value = JSON.stringify({id:id,price:price,name:name});
-          opt.textContent = name + ' — ' + formatRp(price);
-          menuSelect.appendChild(opt);
-        });
-        menuSelect.disabled = false;
+          // Populate select with clean option values and data attributes
+          let added = 0;
+          data.forEach(it => {
+            const id = it.id ?? it.idmenu ?? it.ID ?? it.id_menu ?? it.id_barang ?? null;
+            const name = it.name ?? it.nama ?? it.nama_menu ?? it.title ?? ('Menu ' + (id ?? ''));
+            const price = Number(it.price ?? it.harga ?? it.sell_price ?? 0) || 0;
+            if (id === null) return;
+            const opt = document.createElement('option');
+            opt.value = String(id);
+            opt.dataset.price = String(price);
+            opt.dataset.name = String(name);
+            opt.textContent = name + ' — ' + formatRp(price);
+            menuSelect.appendChild(opt);
+            added++;
+          });
+          // If we added items, enable select; otherwise show placeholder
+          if (added > 0) {
+            menuSelect.disabled = false;
+          } else {
+            menuSelect.innerHTML = '<option value="">-- Tidak ada menu --</option>';
+            menuSelect.disabled = true;
+          }
       }).catch(err => {
         console.error(err);
-        menuSelect.innerHTML = '<option value="">-- Gagal memuat --</option>';
+          menuSelect.innerHTML = '<option value="">-- Gagal memuat --</option>';
+          menuSelect.disabled = true;
       });
   });
 
@@ -171,16 +186,13 @@
 
   addBtn.addEventListener('click', function(){
     if (!menuSelect.value) return;
-    const payload = JSON.parse(menuSelect.value);
+    const selected = menuSelect.options[menuSelect.selectedIndex];
+    const id = selected.value;
+    const name = selected.dataset.name || selected.textContent || '';
+    const price = Number(selected.dataset.price || 0) || 0;
     const jumlah = Math.max(1, parseInt(qtyInput.value || '1'));
     const catatan = noteInput.value || '';
-    cart.push({
-      id: payload.id,
-      name: payload.name,
-      price: Number(payload.price) || 0,
-      jumlah: jumlah,
-      catatan: catatan,
-    });
+    cart.push({ id: id, name: name, price: price, jumlah: jumlah, catatan: catatan });
     // reset qty and note
     qtyInput.value = 1;
     noteInput.value = '';
@@ -217,6 +229,7 @@
       .then(data => {
         if (!data.success) throw new Error(data.message || 'Gagal menyimpan pesanan');
         const token = data.snap_token;
+        lastOrderId = data.id || null;
         if (!token) throw new Error('Snap token tidak tersedia');
 
         // Midtrans client key and environment
@@ -229,16 +242,16 @@
             const s = document.createElement('script');
             s.src = snapSrc;
             s.onload = () => window.snap.pay(token, {
-              onSuccess: function(result){ window.location.href = '/pesanan'; },
-              onPending: function(result){ window.location.href = '/pesanan'; },
+              onSuccess: function(result){ showQrModal(lastOrderId); },
+              onPending: function(result){ showQrModal(lastOrderId); },
               onError: function(result){ alert('Pembayaran gagal: ' + JSON.stringify(result)); payBtn.disabled = false; payBtn.textContent = 'Pesan & Bayar'; },
               onClose: function(){ payBtn.disabled = false; payBtn.textContent = 'Pesan & Bayar'; }
             });
             document.body.appendChild(s);
           } else {
             window.snap.pay(token, {
-              onSuccess: function(result){ window.location.href = '/pesanan'; },
-              onPending: function(result){ window.location.href = '/pesanan'; },
+              onSuccess: function(result){ showQrModal(lastOrderId); },
+              onPending: function(result){ showQrModal(lastOrderId); },
               onError: function(result){ alert('Pembayaran gagal: ' + JSON.stringify(result)); payBtn.disabled = false; payBtn.textContent = 'Pesan & Bayar'; },
               onClose: function(){ payBtn.disabled = false; payBtn.textContent = 'Pesan & Bayar'; }
             });
@@ -255,5 +268,37 @@
   });
 
 })();
+</script>
+<!-- QR Modal -->
+<div class="modal fade" id="qrModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">QR Pembayaran</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <p>Silakan tunjukkan QR berikut kepada petugas atau scan untuk verifikasi.</p>
+        <img id="qrModalImg" src="" alt="QR" style="width:220px;height:220px;display:block;margin:0 auto;border:1px solid #eee;background:#fff;padding:6px" />
+        <div class="mt-2"><a id="qrModalOrderLink" href="/pesanan">Lihat Pesanan</a></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showQrModal(orderId) {
+  if (!orderId) { window.location.href = '/pesanan'; return; }
+  const img = document.getElementById('qrModalImg');
+  img.src = '/pos/' + encodeURIComponent(orderId) + '/qr';
+  const link = document.getElementById('qrModalOrderLink');
+  link.href = '/pesanan';
+  var modalEl = document.getElementById('qrModal');
+  var modal = new bootstrap.Modal(modalEl);
+  modal.show();
+}
 </script>
 @endpush
