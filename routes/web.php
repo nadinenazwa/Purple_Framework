@@ -9,11 +9,19 @@ use App\Http\Controllers\BarangController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\WilayahController;
 use App\Http\Controllers\POSController;
+use App\Http\Controllers\BarcodeController;
 
 // Halaman awal: arahkan ke dashboard (yang dilindungi middleware)
 Route::get('/', function () {
     return redirect()->route('dashboard');
 });
+
+// ── Antrian: public routes (tidak butuh login) ─────────────
+Route::get('/guest',         [App\Http\Controllers\AntrianController::class, 'guestForm'])->name('antrian.guest.pub');
+Route::post('/guest',        [App\Http\Controllers\AntrianController::class, 'guestStore'])->name('antrian.guest.store.pub');
+Route::get('/antrian/{id}',  [App\Http\Controllers\AntrianController::class, 'tiket'])->name('antrian.tiket.pub');
+Route::get('/papan',         [App\Http\Controllers\AntrianController::class, 'papan'])->name('antrian.papan.pub');
+Route::get('/api/antrian/poll', [App\Http\Controllers\AntrianController::class, 'poll'])->name('antrian.poll');
 
 // Redirect plural '/barangs' to '/barang' (folder is named 'barang')
 Route::redirect('/barang', '/barang');
@@ -62,6 +70,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('pos', [POSController::class, 'index'])->name('pos.index');
     // Public POS ordering UI (separate file)
     Route::get('POS', function () { return view('pos_baru'); })->name('POS.menu');
+    // My Order: customer view their saved QR codes
+    Route::get('my-order', function () { return view('pos.my_order'); })->name('pos.my-order');
+
     // Public-friendly kantin (customer-facing) route -> POS ordering UI
     Route::get('kantin', [POSController::class, 'index'])->name('kantin.index');
     Route::get('api/pos/barang/{kode}', [POSController::class, 'getBarang']);
@@ -80,6 +91,29 @@ Route::middleware(['auth'])->group(function () {
     Route::post('api/pos/penjualan', [POSController::class, 'storePenjualan']);
         // API for vendor menus (used by ordering page via AJAX)
         Route::get('api/menus', [POSController::class, 'getMenusByVendor']);
+    // Barcode & QR Code Scanner
+    Route::get('barcode', [BarcodeController::class, 'index'])->name('barcode.index');
+    Route::get('api/barcode/barang/{id}', [BarcodeController::class, 'findBarang'])->name('barcode.find');
+    // Vendor: scan QR pesanan customer
+    Route::get('api/vendor/scan/{orderId}', [App\Http\Controllers\VendorController::class, 'scanOrder'])->name('vendor.scan.order');
+
+    // ---- Kunjungan Toko ----
+    Route::get('toko',          [App\Http\Controllers\TokoController::class, 'index'])->name('toko.index');
+    Route::get('toko/{barcode}',[App\Http\Controllers\TokoController::class, 'show'])->name('toko.show');
+    Route::post('toko',         [App\Http\Controllers\TokoController::class, 'store'])->name('toko.store');
+    Route::post('kunjungan',    [App\Http\Controllers\TokoController::class, 'kunjungan'])->name('toko.kunjungan');
+
+    // ---- Antrian Digital SSE ----
+    Route::get('guest',                    [App\Http\Controllers\AntrianController::class, 'guestForm'])->name('antrian.guest');
+    Route::post('guest',                   [App\Http\Controllers\AntrianController::class, 'guestStore'])->name('antrian.guest.store');
+    Route::get('antrian/{id}',             [App\Http\Controllers\AntrianController::class, 'tiket'])->name('antrian.tiket');
+    Route::get('admin-antrian',            [App\Http\Controllers\AntrianController::class, 'adminDashboard'])->name('antrian.admin');
+    Route::post('admin/panggil',           [App\Http\Controllers\AntrianController::class, 'panggil'])->name('antrian.panggil');
+    Route::post('admin/panggil/{id}',      [App\Http\Controllers\AntrianController::class, 'panggilById'])->name('antrian.panggil.id');
+    Route::post('admin/terlambat/{id}',    [App\Http\Controllers\AntrianController::class, 'terlambat'])->name('antrian.terlambat');
+    Route::post('admin/panggil-terlambat/{id}', [App\Http\Controllers\AntrianController::class, 'panggilTerlambat'])->name('antrian.panggil.terlambat');
+    Route::get('papan',                    [App\Http\Controllers\AntrianController::class, 'papan'])->name('antrian.papan');
+
     // Customer management (camera capture examples)
     Route::get('customer', [App\Http\Controllers\CustomerController::class, 'index'])->name('customer.index');
     Route::get('customer/create-blob', [App\Http\Controllers\CustomerController::class, 'createBlob'])->name('customer.create.blob');
@@ -97,6 +131,8 @@ Route::middleware(['auth'])->group(function () {
     // Vendor area: dashboard & menu management
     Route::prefix('vendor')->name('vendor.')->group(function () {
         Route::get('dashboard', [App\Http\Controllers\VendorController::class, 'dashboard'])->name('dashboard');
+        // Scan QR Code customer
+        Route::get('scan', [App\Http\Controllers\VendorController::class, 'scanPage'])->name('scan');
         Route::resource('menus', App\Http\Controllers\MenuController::class)->names([
             'index' => 'menus.index',
             'create' => 'menus.create',
@@ -139,3 +175,12 @@ Route::get('api/wilayah/provinces', [WilayahController::class, 'provinces']);
 Route::get('api/wilayah/regencies/{provinceId}', [WilayahController::class, 'regencies']);
 Route::get('api/wilayah/districts/{regencyId}', [WilayahController::class, 'districts']);
 Route::get('api/wilayah/villages/{districtId}', [WilayahController::class, 'villages']);
+
+// ── NFC Absensi Routes ────────────────────────────────────────
+use App\Http\Controllers\AbsensiController;
+
+Route::get('/absensi',      [AbsensiController::class, 'index'])->name('absensi.index');
+Route::post('/absensi',     [AbsensiController::class, 'store'])->name('absensi.store');
+Route::get('/daftar-kartu', [AbsensiController::class, 'daftarKartu'])->name('absensi.daftarKartu');
+Route::post('/daftar-kartu',[AbsensiController::class, 'simpanKartu'])->name('absensi.simpanKartu');
+Route::get('/riwayat',      [AbsensiController::class, 'riwayat'])->name('absensi.riwayat');

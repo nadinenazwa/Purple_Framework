@@ -45,6 +45,8 @@
           $extraRight = 0;
           if ($cIndex >= 2) $extraRight += 2; // mm for columns 3+
           if ($cIndex >= 3) $extraRight += 3; // additional mm for columns 4+
+          // extra spacing specifically before column 5 (cIndex >= 4)
+          if ($cIndex >= 4) $extraRight += 8; // push column 5+ further right (increased)
           $leftPos = $baseLeft + $extraRight;
 
           // increase vertical spacing between rows by 2mm (was 21 -> now 23)

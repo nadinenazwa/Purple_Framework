@@ -44,6 +44,43 @@
       </a>
     </li>
 
+    <li class="nav-item {{ request()->is('barcode*') ? 'active' : '' }}">
+      <a class="nav-link" href="{{ route('barcode.index') }}">
+        <span class="menu-title">Barcode Scanner</span>
+        <i class="mdi mdi-barcode-scan menu-icon"></i>
+      </a>
+    </li>
+
+    <li class="nav-item {{ request()->is('toko*') || request()->is('kunjungan*') ? 'active' : '' }}">
+      <a class="nav-link" href="{{ route('toko.index') }}">
+        <span class="menu-title">Kunjungan Toko</span>
+        <i class="mdi mdi-store-marker menu-icon"></i>
+      </a>
+    </li>
+
+    <li class="nav-item {{ request()->is('admin-antrian*') || request()->is('guest*') || request()->is('papan*') ? 'active' : '' }}">
+      <a class="nav-link" data-bs-toggle="collapse" href="#antrianMenu"
+         aria-expanded="{{ request()->is('admin-antrian*') || request()->is('guest*') ? 'true' : 'false' }}"
+         aria-controls="antrianMenu">
+        <span class="menu-title">Antrian Digital</span>
+        <i class="menu-arrow"></i>
+        <i class="mdi mdi-ticket-account menu-icon"></i>
+      </a>
+      <div class="collapse {{ request()->is('admin-antrian*') || request()->is('guest*') ? 'show' : '' }}" id="antrianMenu">
+        <ul class="nav flex-column sub-menu">
+          <li class="nav-item {{ request()->is('guest') ? 'active' : '' }}">
+            <a class="nav-link" href="/guest">Daftar Antrian</a>
+          </li>
+          <li class="nav-item {{ request()->is('admin-antrian') ? 'active' : '' }}">
+            <a class="nav-link" href="{{ route('antrian.admin') }}">Admin Antrian</a>
+          </li>
+          <li class="nav-item {{ request()->is('papan') ? 'active' : '' }}">
+            <a class="nav-link" href="/papan" target="_blank">Papan Antrian</a>
+          </li>
+        </ul>
+      </div>
+    </li>
+
     <li class="nav-item {{ request()->is('POS*') ? 'active' : '' }}">
       <a class="nav-link" href="{{ route('POS.menu') }}">
         <span class="menu-title">POS</span>
@@ -56,6 +93,14 @@
       <a class="nav-link" href="{{ route('kantin.index') }}">
         <span class="menu-title">Kantin Online (Customer)</span>
         <i class="mdi mdi-food-apple menu-icon"></i>
+      </a>
+    </li>
+
+    <!-- My Order - QR Code pesanan saya -->
+    <li class="nav-item {{ request()->is('my-order*') ? 'active' : '' }}">
+      <a class="nav-link" href="{{ route('pos.my-order') }}">
+        <span class="menu-title">My Order / QR Saya</span>
+        <i class="mdi mdi-qrcode-scan menu-icon"></i>
       </a>
     </li>
 
@@ -79,6 +124,14 @@
           </li>
         </ul>
       </div>
+    </li>
+
+    {{-- Vendor: Scan QR Pesanan --}}
+    <li class="nav-item {{ request()->is('vendor/scan*') ? 'active' : '' }}">
+      <a class="nav-link" href="{{ route('vendor.scan') }}">
+        <span class="menu-title">Vendor — Scan QR</span>
+        <i class="mdi mdi-qrcode-scan menu-icon"></i>
+      </a>
     </li>
 
     <li class="nav-item {{ request()->is('wilayah*') ? 'active' : '' }}">
