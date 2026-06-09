@@ -51,6 +51,30 @@
       </a>
     </li>
 
+    {{-- NFC Absensi --}}
+    <li class="nav-item {{ request()->is('absensi*') || request()->is('daftar-kartu*') || request()->is('riwayat*') ? 'active' : '' }}">
+      <a class="nav-link" data-bs-toggle="collapse" href="#nfcMenu"
+         aria-expanded="{{ request()->is('absensi*') || request()->is('daftar-kartu*') || request()->is('riwayat*') ? 'true' : 'false' }}"
+         aria-controls="nfcMenu">
+        <span class="menu-title">NFC Absensi</span>
+        <i class="menu-arrow"></i>
+        <i class="mdi mdi-cellphone-nfc menu-icon"></i>
+      </a>
+      <div class="collapse {{ request()->is('absensi*') || request()->is('daftar-kartu*') || request()->is('riwayat*') ? 'show' : '' }}" id="nfcMenu">
+        <ul class="nav flex-column sub-menu">
+          <li class="nav-item {{ request()->is('absensi') ? 'active' : '' }}">
+            <a class="nav-link" href="{{ route('absensi.index') }}">Scan Absensi</a>
+          </li>
+          <li class="nav-item {{ request()->is('daftar-kartu') ? 'active' : '' }}">
+            <a class="nav-link" href="{{ route('absensi.daftarKartu') }}">Daftar Kartu</a>
+          </li>
+          <li class="nav-item {{ request()->is('riwayat') ? 'active' : '' }}">
+            <a class="nav-link" href="{{ route('absensi.riwayat') }}">Riwayat Absensi</a>
+          </li>
+        </ul>
+      </div>
+    </li>
+
     <li class="nav-item {{ request()->is('toko*') || request()->is('kunjungan*') ? 'active' : '' }}">
       <a class="nav-link" href="{{ route('toko.index') }}">
         <span class="menu-title">Kunjungan Toko</span>
